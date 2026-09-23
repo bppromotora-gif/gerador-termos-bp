@@ -10,9 +10,18 @@
   .logo { display: block; max-width: 220px; height: auto; margin: 0 auto 12px; }
   h1 { color: #1155cc; margin: 0 0 4px; text-align: center; font-size: 1.2rem; }
   p.sub { text-align: center; color: #6B6B6B; font-size: 0.85rem; margin: 0 0 20px; }
-  details.como-usar { margin: 0 0 20px; border: 1px solid #E5E7EB; border-radius: 8px; padding: 10px 14px; }
-  details.como-usar summary { cursor: pointer; font-weight: bold; color: #1155cc; font-size: 0.9rem; }
-  details.como-usar img { width: 100%; border-radius: 6px; margin-top: 10px; display: block; }
+  details.como-usar { margin: 0 0 20px; }
+  details.como-usar summary {
+    cursor: pointer; font-weight: bold; color: #FFFFFF; font-size: 0.95rem;
+    background-color: #F27C1B; border-radius: 6px; padding: 12px;
+    text-align: center; list-style: none; user-select: none;
+  }
+  details.como-usar summary::-webkit-details-marker { display: none; }
+  details.como-usar summary::before { content: "▶ "; }
+  details.como-usar[open] summary::before { content: "▼ "; }
+  details.como-usar[open] summary { border-radius: 6px 6px 0 0; }
+  details.como-usar .conteudo { border: 2px solid #F27C1B; border-top: none; border-radius: 0 0 6px 6px; padding: 12px; }
+  details.como-usar img { width: 100%; border-radius: 4px; display: block; }
   textarea { width: 100%; height: 160px; margin-bottom: 12px; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; resize: vertical; font-size: 0.95rem; }
   button { padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.95rem; transition: 0.2s; }
   button:hover { opacity: 0.9; }
@@ -31,8 +40,10 @@
     <p class="sub">Versão web — sem instalação. Cole o texto do sistema, gere e copie o termo certo.</p>
 
     <details class="como-usar">
-      <summary>▶ Como usar (passo a passo)</summary>
-      <img src="passo-a-passo.gif" alt="Passo a passo de como usar o Gerador de Termos BP" loading="lazy">
+      <summary>Como usar (passo a passo)</summary>
+      <div class="conteudo">
+        <img src="passo-a-passo.gif" alt="Passo a passo de como usar o Gerador de Termos BP" loading="lazy">
+      </div>
     </details>
 
     <textarea id="textoCru" placeholder="Cole aqui o texto cru do sistema..."></textarea>
