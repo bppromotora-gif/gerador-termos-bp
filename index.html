@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gerador de Termos BP</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #F3F4F6; margin: 0; padding: 24px 16px; }
+  .card { max-width: 600px; margin: 0 auto; background: #FFFFFF; border-radius: 10px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  h1 { color: #1155cc; margin: 0 0 4px; text-align: center; font-size: 1.4rem; }
+  p.sub { text-align: center; color: #6B6B6B; font-size: 0.85rem; margin: 0 0 20px; }
+  textarea { width: 100%; height: 160px; margin-bottom: 12px; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; resize: vertical; font-size: 0.95rem; }
+  button { padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.95rem; transition: 0.2s; }
+  button:hover { opacity: 0.9; }
+  .linha-botoes { display: flex; gap: 10px; margin-bottom: 8px; }
+  .btn-gerar { background-color: #1155cc; color: white; flex: 2; }
+  .btn-limpar { background-color: #ea4335; color: white; flex: 1; }
+  .btn-copiar { background-color: #34a853; color: white; display: block; width: 100%; margin-top: 8px; padding: 12px; }
+  #botoes-copia { margin-top: 16px; }
+  #mensagem { color: #34a853; font-size: 0.9rem; margin-top: 12px; font-weight: bold; text-align: center; min-height: 18px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Gerador de Termos BP</h1>
+    <p class="sub">Versão web — sem instalação. Cole o texto do sistema, gere e copie o termo certo.</p>
+
+    <textarea id="textoCru" placeholder="Cole aqui o texto cru do sistema..."></textarea>
+
+    <div class="linha-botoes">
+      <button class="btn-gerar" id="btnGerar" style="flex: 2;">Processar Dados</button>
+      <button class="btn-limpar" id="btnLimpar" style="flex: 1;" title="Limpar para o próximo cliente">Limpar</button>
+    </div>
+
+    <div id="botoes-copia"></div>
+    <div id="mensagem"></div>
+  </div>
+
+<script>
+// Mesma logica do popup.js da extensao Chrome, adaptada pra rodar como
+// pagina web comum (sem chrome.storage.local -> usa localStorage no
+// lugar, sem manifest/host_permissions -> fetch comum). Le do MESMO Gist
+// que a extensao le, entao editar o texto pela aba 'Termos da Extensao'
+// do dashboard atualiza os dois ao mesmo tempo.
+const TEMPLATES_URL = 'https://gist.githubusercontent.com/bppromotora-gif/4188860a578eb94ab299a8ab555cc258/raw/templates.json';
+
+const TEMPLATES_RESERVA = {
+    operacoes: {
+        port_pura: {
+            titulo_botao: 'Copiar Termo: Portabilidade',
+            usa_troco: false,
+            texto: '{{DATA}}\nSr(a). {{NOME}}\nCPF: {{CPF}}\n\nSua proposta de PORTABILIDADE da(s) parcela(s):\nParcela: {{PARCELAS}}\nBanco: {{BANCOS}}\nReduziremos sua parcela de acordo com o saldo devedor informado pelo Banco de Origem\n\nInformamos que o saldo devedor apresentado nesta simulação é estimado, podendo sofrer alteração de até 15% para mais ou para menos, conforme o saldo devedor real enviado pela instituição financeira atual.\nO valor da sua parcela não aumentará e o prazo do contrato seguirá com o prazo restante atual\nCaso a instituição financeira atual não envie o saldo devedor ou este não esteja dentro das conformidades da proposta, não concluiremos a portabilidade dessa parcela. Ressaltamos que cada parcela é um contrato independente, ou seja, uma operação não depende da outra para ser concluída, pois as análises são realizadas de forma individual.\n\nSeu contrato não tem refinanciamento, não reiniciará o prazo e não vai liberar troco.\nNessa operação reduziremos a sua parcela, manteremos o seu prazo atual e será liberado em sua conta o estorno da parcela.\n• Estorno da parcela = Valor referente à parcela em trânsito, que é cobrada pelo banco de origem no momento da portabilidade. Em alguns casos pode levar até 2 pagamentos para ocorrer.\n\nA redução de parcela informada acima é uma estimativa, podendo sofrer alteração conforme o saldo devedor real enviado pelo banco de origem.\n\n⚠️ Operação gratuita\nNão solicitamos PIX, depósito, taxa ou qualquer tipo de pagamento.\n\nÚNICO CANAL OFICIAL DE ATENDIMENTO\nCentral BP\n(48) 96136-4577\n\nQualquer oferta enviada anteriormente a esta mensagem não será válida.\n\nVOCÊ *AUTORIZA* O ANDAMENTO DA PROPOSTA?',
+        },
+        port_refin: {
+            titulo_botao: 'Copiar Termo: Portabilidade + Refinanciamento',
+            usa_troco: true,
+            texto: '{{DATA}}\nSr(a). {{NOME}}\nCPF: {{CPF}}\n\nSua proposta de PORTABILIDADE + REFINANCIAMENTO da(s) parcela(s):\nParcela: {{PARCELAS}}\nBanco: {{BANCOS}}\nTroco previsto: R$ {{TROCO}}\n(podendo variar de acordo com o saldo devedor informado pelo banco de origem)\n\nInformamos que o saldo devedor apresentado nesta simulação é estimado, podendo sofrer alteração de até 15% para mais ou para menos, conforme o saldo devedor real enviado pela instituição financeira atual.\nO valor da sua parcela não aumentará e o prazo do contrato seguirá o padrão do INSS de 108 meses.\nCaso a instituição financeira atual não envie o saldo devedor ou este não esteja dentro das conformidades da proposta, não concluiremos a portabilidade dessa parcela. Ressaltamos que cada parcela é um contrato independente, ou seja, uma operação não depende da outra para ser concluída, pois as análises são realizadas de forma individual.\n\nApós a conclusão da portabilidade, é realizado o refinanciamento dessa parcela, com liberação do valor de troco diretamente em sua conta onde recebe o benefício do INSS.\nImportante esclarecer que existem dois valores diferentes nesta operação:\n• Troco liberado = Valor adicional gerado no refinanciamento, que será depositado diretamente em sua conta bancária.\n• Estorno da parcela = Valor referente à parcela em trânsito, que é cobrada pelo banco de origem no momento da portabilidade.\n\nO valor de troco informado acima é uma estimativa, podendo sofrer alteração conforme o saldo devedor real enviado pelo banco de origem.\nCaso algum dos bancos portados não envie o saldo devedor conforme a proposta, pode ocorrer alteração no valor total do troco.\n\n⚠️ Operação gratuita\nNão solicitamos PIX, depósito, taxa ou qualquer tipo de pagamento.\n\nA aprovação da proposta depende de análise do banco, envio de saldo pela instituição de origem (quando aplicável) e validação do INSS, podendo ser cancelada sem comunicação prévia.\n\nÚNICO CANAL OFICIAL DE ATENDIMENTO\nCentral BP\n(48) 96136-4577\n\nQualquer oferta enviada anteriormente a esta mensagem não será válida.\n\nVOCÊ *AUTORIZA* O ANDAMENTO DA PROPOSTA?',
+        },
+        refin_blocos: {
+            titulo_botao: 'Copiar Termo: Refinanciamento',
+            usa_troco: true,
+            texto: 'CONFIRMAÇÃO DE REFINANCIAMENTO – BP PROMOTORA (Correspondente Inbursa)\n\nDATA: {{DATA}}\nNOME: {{NOME}}\nCPF: {{CPF}}\n{{BLOCOS}}\nINFORMAÇÕES IMPORTANTES\n• O saldo devedor é simulado e pode mudar conforme o saldo real.\n• O valor da parcela não sofre alteração.\n• Prazo do contrato: 108 meses (padrão INSS).\n• Operação gratuita. Não solicitamos PIX, depósito, taxa ou qualquer tipo de pagamento.\n• Em caso de unificação de parcelas, se uma das parcelas não estiver apta ao refinanciamento, será dado andamento apenas nas parcelas disponíveis.\n• Em caso de margem negativa, o valor da parcela poderá ser reduzido para enquadrar o contrato nas regras do INSS.\n\nLIBERAÇÃO DO TROCO\n• Valor total aproximado: R$ {{TROCO}}.\n• Liberado após a conclusão do refinanciamento.\n• Depósito em até 5 dias úteis após o desbloqueio do benefício no aplicativo Meu INSS e aprovação da Anuência\n• O valor será depositado na conta onde o cliente recebe o benefício do INSS.\n• Em casos de recebimento via conta-salário, o depósito será feito em conta onde o cliente possua PIX cadastrado.\n\nCARÊNCIA / ESTORNO\n• Pode ocorrer até o dia 22 do mês seguinte, dependendo da virada de folha do INSS.\n• Em alguns casos, pode levar até 2 pagamentos do benefício para ocorrer.\n\nÚNICOS CANAIS OFICIAIS DE ATENDIMENTO\nCENTRAL BP: (48) 96136-4577\nCENTRAL DE ATENDIMENTO DO BANCO INBURSA\n\nQualquer oferta enviada anteriormente a esta mensagem não será válida.\nA aprovação depende da análise do banco e validação do INSS, podendo ser cancelada sem comunicação prévia\n\nVOCÊ *AUTORIZA* O ANDAMENTO DA PROPOSTA?',
+        },
+    },
+    bancos: [
+        { id: 'inbursa', nome_exibicao: 'INBURSA', palavras_chave: ['INBURSA'], operacoes_permitidas: ['refin_blocos'] },
+        { id: 'c6', nome_exibicao: 'C6', palavras_chave: ['FICSA', 'C6'], operacoes_permitidas: ['port_refin'] },
+        { id: 'digio', nome_exibicao: 'DIGIO', palavras_chave: ['DIGIO'], operacoes_permitidas: ['port_pura'] },
+    ],
+};
+
+let templatesAtuais = TEMPLATES_RESERVA;
+let templatesProntos = null;
+
+function formatoValido(dados) {
+    return !!dados && dados.operacoes && typeof dados.operacoes === 'object' && Array.isArray(dados.bancos);
+}
+
+function lerCacheLocal() {
+    try {
+        const bruto = localStorage.getItem('templatesCache');
+        return bruto ? JSON.parse(bruto) : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function carregarTemplates() {
+    templatesProntos = fetch(TEMPLATES_URL + '?t=' + Date.now())
+        .then((resp) => {
+            if (!resp.ok) throw new Error('resposta invalida');
+            return resp.json();
+        })
+        .then((dados) => {
+            if (!formatoValido(dados)) throw new Error('formato de templates invalido');
+            templatesAtuais = dados;
+            try { localStorage.setItem('templatesCache', JSON.stringify(dados)); } catch (e) {}
+        })
+        .catch(() => {
+            const cache = lerCacheLocal();
+            if (formatoValido(cache)) {
+                templatesAtuais = cache;
+            }
+        });
+    return templatesProntos;
+}
+
+function preencherTemplate(texto, valores) {
+    return texto.replace(/\{\{(\w+)\}\}/g, (match, chave) => {
+        const valor = valores[chave];
+        return valor !== undefined ? valor : match;
+    });
+}
+
+function encontrarBanco(bancos, destinoBruto) {
+    return (bancos || []).find((b) => (b.palavras_chave || []).some((kw) => destinoBruto.includes(kw.toUpperCase())));
+}
+
+function escolherOperacao(banco, operacoesDisponiveis, troco) {
+    const ids = (banco.operacoes_permitidas || []).filter((id) => operacoesDisponiveis[id]);
+    if (ids.length <= 1) return ids[0] || null;
+    const comTroco = ids.filter((id) => operacoesDisponiveis[id].usa_troco === true);
+    const semTroco = ids.filter((id) => operacoesDisponiveis[id].usa_troco === false);
+    if (troco > 0 && comTroco.length > 0) return comTroco[0];
+    if (troco === 0 && semTroco.length > 0) return semTroco[0];
+    return comTroco[0] || semTroco[0] || ids[0];
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    const prontos = carregarTemplates();
+
+    let textoSalvo = null;
+    try { textoSalvo = localStorage.getItem('textoSalvo'); } catch (e) {}
+    if (textoSalvo) {
+        document.getElementById('textoCru').value = textoSalvo;
+        prontos.then(() => processarDados());
+    }
+});
+
+document.getElementById('btnGerar').addEventListener('click', () => {
+    const texto = document.getElementById('textoCru').value;
+    try { localStorage.setItem('textoSalvo', texto); } catch (e) {}
+    (templatesProntos || Promise.resolve()).then(() => processarDados());
+});
+
+document.getElementById('btnLimpar').addEventListener('click', () => {
+    try { localStorage.removeItem('textoSalvo'); } catch (e) {}
+    document.getElementById('textoCru').value = '';
+    document.getElementById('botoes-copia').innerHTML = '';
+
+    const msgDiv = document.getElementById('mensagem');
+    msgDiv.style.color = '#ea4335';
+    msgDiv.innerText = 'Memória limpa! Pronto para o próximo cliente.';
+    setTimeout(() => {
+        msgDiv.innerText = '';
+        msgDiv.style.color = '#34a853';
+    }, 3000);
+});
+
+function processarDados() {
+    const texto = document.getElementById('textoCru').value;
+    const divBotoes = document.getElementById('botoes-copia');
+    divBotoes.innerHTML = '';
+    document.getElementById('mensagem').innerText = '';
+
+    if (!texto.trim()) {
+        alert('Cole o texto do sistema primeiro!');
+        return;
+    }
+
+    const hoje = new Date();
+    const dataFormatada = hoje.toLocaleDateString('pt-BR');
+
+    const nomeMatch = texto.match(/([A-Z\s]+)\n\s*\n\s*CPF:/);
+    const cpfMatch = texto.match(/CPF:\s*([\d.-]+)/);
+
+    const nome = nomeMatch ? nomeMatch[1].trim() : 'CLIENTE';
+    const cpf = cpfMatch ? cpfMatch[1].trim() : 'XXX.XXX.XXX-XX';
+
+    const linhas = texto.split('\n').filter((l) => l.includes('NB '));
+    const operacoes = {};
+    const avisos = [];
+
+    linhas.forEach((linha) => {
+        const parcelaMatch = linha.match(/PARCELA R\$([\d,.]+)/);
+        const bancoMatch = linha.match(/\/ \d+ - (.+?) \/ CONTRATO/);
+        const trocoMatch = linha.match(/TROCO R\$([\d,.]+)/);
+
+        if (parcelaMatch) {
+            const parcela = parcelaMatch[1];
+
+            let bancoNome = bancoMatch ? bancoMatch[1].trim() : '';
+            if (bancoNome && !bancoNome.toUpperCase().startsWith('BANCO')) {
+                bancoNome = bancoNome.split(' ')[0];
+            }
+
+            const troco = trocoMatch ? parseFloat(trocoMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
+
+            let destinoBruto = linha.split('>').pop().trim().toUpperCase();
+
+            const banco = encontrarBanco(templatesAtuais.bancos, destinoBruto);
+            if (!banco) {
+                avisos.push(`Banco não reconhecido: "${destinoBruto}" (linha ignorada — cadastre na tela de administração)`);
+                return;
+            }
+            const operacaoId = escolherOperacao(banco, templatesAtuais.operacoes, troco);
+            if (!operacaoId) {
+                avisos.push(`Banco "${banco.nome_exibicao}" sem operação configurada (linha ignorada)`);
+                return;
+            }
+
+            const chave = operacaoId;
+            if (!operacoes[chave]) {
+                operacoes[chave] = { operacaoId, parcelas: [], bancos: [], trocoTotal: 0, blocosIndividuais: [] };
+            }
+            const op = operacoes[chave];
+
+            op.parcelas.push(`R$ ${parcela}`);
+            if (bancoNome && bancoNome !== '' && !op.bancos.includes(bancoNome)) {
+                op.bancos.push(bancoNome);
+            }
+            op.trocoTotal += troco;
+            op.blocosIndividuais.push({
+                parcelaAtual: parcela,
+                trocoAprox: troco.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+            });
+        }
+    });
+
+    for (const chave in operacoes) {
+        const op = operacoes[chave];
+        const tpl = templatesAtuais.operacoes[op.operacaoId];
+        if (!tpl) continue;
+
+        const parcelasStr = op.parcelas.join(' / ');
+        const bancosStr = op.bancos.join(' e ');
+        const trocoFormatado = op.trocoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
+        let blocosTexto = '';
+        if (op.operacaoId === 'refin_blocos') {
+            const linhasUnificadas = texto.split('\n').filter((l) => l.includes('Parcela unificada'));
+
+            if (linhasUnificadas.length > 0) {
+                linhasUnificadas.forEach((linhaUni) => {
+                    const parcelasIndividuais = [];
+                    const regexParcelas = /Parcela\s+([\d,.]+)/gi;
+                    let m;
+                    while ((m = regexParcelas.exec(linhaUni)) !== null) {
+                        parcelasIndividuais.push(`R$ ${m[1]}`);
+                    }
+                    const unificadaMatch = linhaUni.match(/Parcela unificada\s+([\d,.]+)/i);
+                    const parcelaTotal = unificadaMatch ? unificadaMatch[1] : '';
+
+                    const trocoMatchUni = linhaUni.match(/Troco aproximado:\s*([\d.,]+)/i);
+                    const trocoTotalUni = trocoMatchUni ? trocoMatchUni[1] : '';
+
+                    if (parcelasIndividuais.length > 0) {
+                        blocosTexto += `Parcela(s) atual(is): ${parcelasIndividuais.join(' / ')}\nParcela Total: R$ ${parcelaTotal}\nTroco aproximado total: R$ ${trocoTotalUni}\n`;
+                    }
+                });
+            } else {
+                op.blocosIndividuais.forEach((bloco) => {
+                    blocosTexto += `Parcela(s) atual(is): R$ ${bloco.parcelaAtual}\nParcela Total: R$ ${bloco.parcelaAtual}\nTroco aproximado total: R$ ${bloco.trocoAprox}\n`;
+                });
+            }
+        }
+
+        const textoFinal = preencherTemplate(tpl.texto, {
+            DATA: dataFormatada,
+            NOME: nome,
+            CPF: cpf,
+            PARCELAS: parcelasStr,
+            BANCOS: bancosStr,
+            TROCO: trocoFormatado,
+            BLOCOS: blocosTexto,
+        });
+        const tituloBotao = bancosStr ? `${tpl.titulo_botao} - ${bancosStr}` : tpl.titulo_botao;
+
+        const btn = document.createElement('button');
+        btn.className = 'btn-copiar';
+        btn.innerText = tituloBotao;
+
+        btn.onclick = () => {
+            navigator.clipboard.writeText(textoFinal).then(() => {
+                const msgDiv = document.getElementById('mensagem');
+                msgDiv.style.color = '#34a853';
+                msgDiv.innerText = `${tituloBotao} copiado com sucesso!`;
+                setTimeout(() => { msgDiv.innerText = ''; }, 3000);
+            });
+        };
+        divBotoes.appendChild(btn);
+    }
+
+    if (avisos.length > 0) {
+        const avisoDiv = document.getElementById('mensagem');
+        avisoDiv.style.color = '#ea4335';
+        avisoDiv.innerText = avisos.join(' | ');
+    }
+}
+</script>
+</body>
+</html>
