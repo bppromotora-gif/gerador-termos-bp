@@ -295,7 +295,7 @@ function processarDados() {
             TROCO: trocoFormatado,
             BLOCOS: blocosTexto,
         });
-        const tituloBotao = bancosStr ? `${tpl.titulo_botao} - ${bancosStr}` : tpl.titulo_botao;
+        const tituloBotao = tpl.titulo_botao;
 
         const btn = document.createElement('button');
         btn.className = 'btn-copiar';
