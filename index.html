@@ -31,10 +31,42 @@
   .btn-copiar { background-color: #34a853; color: white; display: block; width: 100%; margin-top: 8px; padding: 12px; }
   #botoes-copia { margin-top: 16px; }
   #mensagem { color: #34a853; font-size: 0.9rem; margin-top: 12px; font-weight: bold; text-align: center; min-height: 18px; }
+
+  .abas { max-width: 600px; margin: 0 auto 16px; display: flex; gap: 8px; }
+  .aba-btn {
+    flex: 1; background: #E5E7EB; color: #374151; padding: 10px; border-radius: 8px;
+    font-size: 0.9rem;
+  }
+  .aba-btn.ativa { background: #1155cc; color: #FFFFFF; }
+
+  .conversor-drop {
+    display: block; border: 2px dashed #B9C2CE; border-radius: 8px; padding: 18px; text-align: center;
+    color: #6B6B6B; font-size: 0.9rem; margin-bottom: 12px; cursor: pointer; background: #FAFBFC;
+  }
+  .conversor-drop:hover { border-color: #1155cc; }
+  #conversorArquivos { display: none; }
+  .conversor-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid #E5E7EB;
+    border-radius: 8px; margin-bottom: 8px;
+  }
+  .conversor-item img { width: 44px; height: 44px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
+  .conversor-item .info { flex: 1; min-width: 0; font-size: 0.85rem; }
+  .conversor-item .info .nome { font-weight: bold; color: #1F1F1F; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .conversor-item .info .status { color: #6B6B6B; }
+  .conversor-item .info .status.erro { color: #ea4335; }
+  .conversor-item a.btn-baixar {
+    background: #34a853; color: #FFFFFF; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem;
+    font-weight: bold; text-decoration: none; flex-shrink: 0;
+  }
 </style>
 </head>
 <body>
-  <div class="card">
+  <div class="abas">
+    <button class="aba-btn ativa" id="abaTermo">📄 Gerador de Termo</button>
+    <button class="aba-btn" id="abaConversor">🖼️ Conversor de Imagem</button>
+  </div>
+
+  <div class="card" id="viewTermo">
     <img class="logo" src="logo.png" alt="BP Promotora de Créditos">
     <h1>Gerador de Termos BP</h1>
     <p class="sub">Versão web — sem instalação. Cole o texto do sistema, gere e copie o termo certo.</p>
@@ -55,6 +87,19 @@
 
     <div id="botoes-copia"></div>
     <div id="mensagem"></div>
+  </div>
+
+  <div class="card" id="viewConversor" style="display: none;">
+    <h1>Conversor de Imagem</h1>
+    <p class="sub">Converte JFIF, WEBP, PNG e outras imagens pra JPEG — tudo no navegador, nada é enviado pra internet.</p>
+
+    <label class="conversor-drop" for="conversorArquivos">
+      📁 Clique aqui pra escolher a(s) imagem(ns)<br>(pode selecionar mais de uma de uma vez)
+    </label>
+    <input type="file" id="conversorArquivos" accept="image/*,.jfif,.jtif,.webp" multiple>
+
+    <div id="conversorLista"></div>
+    <div id="conversorMensagem" style="color: #ea4335; font-size: 0.85rem; text-align: center; min-height: 18px;"></div>
   </div>
 
 <script>
@@ -343,6 +388,105 @@ function processarDados() {
         avisoDiv.innerText = avisos.join(' | ');
     }
 }
+
+// --- Abas (Gerador de Termo / Conversor de Imagem) ---
+
+document.getElementById('abaTermo').addEventListener('click', () => {
+    document.getElementById('abaTermo').classList.add('ativa');
+    document.getElementById('abaConversor').classList.remove('ativa');
+    document.getElementById('viewTermo').style.display = '';
+    document.getElementById('viewConversor').style.display = 'none';
+});
+
+document.getElementById('abaConversor').addEventListener('click', () => {
+    document.getElementById('abaConversor').classList.add('ativa');
+    document.getElementById('abaTermo').classList.remove('ativa');
+    document.getElementById('viewConversor').style.display = '';
+    document.getElementById('viewTermo').style.display = 'none';
+});
+
+// --- Conversor de Imagem (tudo local, no navegador - nenhum arquivo sai
+// da maquina da pessoa). Desenha a imagem escolhida num <canvas> e
+// reexporta como JPEG - funciona pra qualquer formato que o navegador
+// sabe decodificar nativamente (JFIF e um JPEG por baixo, WEBP/PNG/GIF/
+// BMP os navegadores modernos ja leem direto). Um formato realmente fora
+// do padrao (ex: um .jtif que nao seja so um JPEG renomeado) nao vai ser
+// decodificado pelo <img> e cai no bloco de erro por arquivo. */
+function nomeComExtensaoJpeg(nomeOriginal) {
+    const semExtensao = nomeOriginal.replace(/\.[^.]+$/, '');
+    return `${semExtensao}.jpg`;
+}
+
+function converterArquivoParaJpeg(arquivo) {
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(arquivo);
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            // fundo branco - imagens com transparencia (ex: PNG/WEBP) nao tem
+            // canal alfa em JPEG, sem isso ficariam pretas nessas areas.
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+            URL.revokeObjectURL(url);
+            canvas.toBlob((blob) => {
+                if (!blob) { reject(new Error('Não foi possível gerar o JPEG')); return; }
+                resolve(blob);
+            }, 'image/jpeg', 0.92);
+        };
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('Formato não reconhecido pelo navegador'));
+        };
+        img.src = url;
+    });
+}
+
+document.getElementById('conversorArquivos').addEventListener('change', async (ev) => {
+    const arquivos = Array.from(ev.target.files || []);
+    ev.target.value = ''; // permite escolher o mesmo arquivo de novo depois
+    if (arquivos.length === 0) return;
+
+    const lista = document.getElementById('conversorLista');
+    document.getElementById('conversorMensagem').innerText = '';
+
+    for (const arquivo of arquivos) {
+        const item = document.createElement('div');
+        item.className = 'conversor-item';
+        item.innerHTML = `
+            <img src="" alt="">
+            <div class="info">
+                <div class="nome"></div>
+                <div class="status">Convertendo...</div>
+            </div>
+        `;
+        lista.prepend(item);
+        const imgPreview = item.querySelector('img');
+        const nomeDiv = item.querySelector('.nome');
+        const statusDiv = item.querySelector('.status');
+        nomeDiv.innerText = arquivo.name;
+
+        try {
+            const blob = await converterArquivoParaJpeg(arquivo);
+            const urlJpeg = URL.createObjectURL(blob);
+            imgPreview.src = urlJpeg;
+            statusDiv.innerText = `Pronto (${(blob.size / 1024).toFixed(0)} KB)`;
+
+            const link = document.createElement('a');
+            link.className = 'btn-baixar';
+            link.href = urlJpeg;
+            link.download = nomeComExtensaoJpeg(arquivo.name);
+            link.innerText = '⬇️ Baixar .jpg';
+            item.appendChild(link);
+        } catch (e) {
+            statusDiv.classList.add('erro');
+            statusDiv.innerText = `Erro: ${e.message}`;
+        }
+    }
+});
 </script>
 </body>
 </html>
