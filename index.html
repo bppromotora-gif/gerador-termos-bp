@@ -93,6 +93,28 @@ const TEMPLATES_RESERVA = {
 let templatesAtuais = TEMPLATES_RESERVA;
 let templatesProntos = null;
 
+// Data "de verdade" (nao depende do relogio do computador, que pode estar
+// desacertado) - buscada da Cloudflare, que devolve o horario certo no
+// corpo da resposta (o cabecalho 'Date' de respostas cross-origin nao
+// fica acessivel via JS por causa do CORS). Se nunca conseguir falar com
+// a internet, cai no relogio local mesmo (unica opcao sobrando).
+let dataServidor = null;
+let dataServidorProntos = null;
+
+function carregarDataServidor() {
+    dataServidorProntos = fetch('https://www.cloudflare.com/cdn-cgi/trace')
+        .then((resp) => resp.text())
+        .then((texto) => {
+            const match = texto.match(/^ts=(\d+(?:\.\d+)?)/m);
+            if (!match) throw new Error('formato inesperado');
+            const epochMs = parseFloat(match[1]) * 1000;
+            if (isNaN(epochMs)) throw new Error('timestamp invalido');
+            dataServidor = new Date(epochMs);
+        })
+        .catch(() => {});
+    return dataServidorProntos;
+}
+
 function formatoValido(dados) {
     return !!dados && dados.operacoes && typeof dados.operacoes === 'object' && Array.isArray(dados.bancos);
 }
@@ -148,7 +170,7 @@ function escolherOperacao(banco, operacoesDisponiveis, troco) {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-    const prontos = carregarTemplates();
+    const prontos = Promise.all([carregarTemplates(), carregarDataServidor()]);
 
     let textoSalvo = null;
     try { textoSalvo = localStorage.getItem('textoSalvo'); } catch (e) {}
@@ -161,7 +183,10 @@ window.addEventListener('DOMContentLoaded', () => {
 document.getElementById('btnGerar').addEventListener('click', () => {
     const texto = document.getElementById('textoCru').value;
     try { localStorage.setItem('textoSalvo', texto); } catch (e) {}
-    (templatesProntos || Promise.resolve()).then(() => processarDados());
+    Promise.all([
+        templatesProntos || Promise.resolve(),
+        dataServidorProntos || Promise.resolve(),
+    ]).then(() => processarDados());
 });
 
 document.getElementById('btnLimpar').addEventListener('click', () => {
@@ -189,7 +214,7 @@ function processarDados() {
         return;
     }
 
-    const hoje = new Date();
+    const hoje = dataServidor || new Date();
     const dataFormatada = hoje.toLocaleDateString('pt-BR');
 
     const nomeMatch = texto.match(/([A-Z\s]+)\n\s*\n\s*CPF:/);
